@@ -37,14 +37,14 @@ type ServiceRenderedPayload = Record<{
 const saloonStorage = new StableBTreeMap<string, Saloon>(0, 44, 1024);
 
 
-// fetches all saloons created. 
+// Function to fetch all saloons created. 
 $query;
 export function getAllSaloons(): Result<Vec<Saloon>, string> {
     return Result.Ok(saloonStorage.values());
 }
 
 
-// gets the information about a saloon through it's id.
+// Function that gets the information about a saloon through it's id.
 $query;
 export function getSaloonById(id: string): Result<Saloon, string> {
     return match(saloonStorage.get(id), {
@@ -69,7 +69,8 @@ export function createService (id: string, payload : ServiceRenderedPayload): Re
     const serviceRendered: ServiceRendered = {id: uuidv4(), createdAt: ic.time(), ...payload };
     const saloon = match(saloonStorage.get(id), {
         Some: (saloon) => {
-
+            
+        // Checks if caller is the same as the owner of the saloon
             if(saloon.owner.toString() !== ic.caller().toString()){
                 return Result.Err<Saloon, string>("You are not the owner of this saloon")
             }
@@ -82,9 +83,7 @@ export function createService (id: string, payload : ServiceRenderedPayload): Re
                 }
 
             saloonStorage.insert(saloon.id, Saloon);
-
             return Result.Ok<Saloon, string>(Saloon);
-            
         },
         None: () => Result.Err<Saloon, string>("Unable to carry out the following function")
     })
@@ -93,26 +92,39 @@ export function createService (id: string, payload : ServiceRenderedPayload): Re
 
 }
 
-// allow users to delete his / her saloon
+// Function that allow users to delete his / her saloon
 $update;
 export function deleteSaloon(id: string): Result<Saloon, string> {
     return match(saloonStorage.remove(id), {
-        Some: (deletedSaloon) => Result.Ok<Saloon, string>(deletedSaloon),
-        None: () => Result.Err<Saloon, string>(`couldn't delete a saloon with id=${id}. saloon not found.`)
-    });
+        Some: (saloon) => {
+            // checks if caller is the same as owner
+            if(saloon.owner.toString() !== ic.caller().toString()){
+                return Result.Err<Saloon, string>("You are not the owner of this saloon")
+            }
+            saloonStorage.remove(id)
+            return Result.Ok<Saloon, string>(saloon)
+        },
+        None: () => Result.Err<Saloon, string>(`couldn't delete saloon with this id=${id}. saloon not found.`)
+    })
 }
 
 
+// Function that allow user to rate a saloon
 $update;
 export function rateSaloon(id: string, rate: number): Result<Saloon, string> {
     
+    // Gets the saloon details by it's id
     const saloonRating: any = match(saloonStorage.get(id), {
+    
+    // returns the curent rating value 
         Some: (saloon) => {
             return saloon.rating;
         },
         None: () => Result.Err<Saloon, string>(`Error updating saloon with the id=${id}. Saloon not found`)
     })
 
+    // Calculates the new rating by adding the current rating to the user's 
+    // rating and dividing the result by 5
     const rating: any = ((saloonRating + rate) / 5);
 
     return match(saloonStorage.get(id), {
@@ -130,7 +142,7 @@ export function rateSaloon(id: string, rate: number): Result<Saloon, string> {
 }
 
 
-// function to update a saloon by its id
+// Function to update a saloon by its id
 $update;
 export function updateSaloonById(id: string, payload: SaloonPayload): Result<Saloon, string> {
     return match(saloonStorage.get(id), {
