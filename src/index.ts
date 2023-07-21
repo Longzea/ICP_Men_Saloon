@@ -23,7 +23,7 @@ type ServiceRendered = Record<{
     id: string;
     serviceName: string;
     serviceDescription: string;
-    serviceAmount: string;
+    serviceAmount: number;
     createdAt: nat64;
 }>
 
