@@ -19,12 +19,12 @@ type ServiceRendered = record {
   serviceName : text;
   createdAt : nat64;
   serviceDescription : text;
-  serviceAmount : text;
+  serviceAmount : float64;
 };
 type ServiceRenderedPayload = record {
   serviceName : text;
   serviceDescription : text;
-  serviceAmount : text;
+  serviceAmount : float64;
 };
 type _AzleResult = variant { Ok : Saloon; Err : text };
 type _AzleResult_1 = variant { Ok : vec Saloon; Err : text };

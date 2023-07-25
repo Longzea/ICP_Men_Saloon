@@ -23,14 +23,14 @@ type ServiceRendered = Record<{
     id: string;
     serviceName: string;
     serviceDescription: string;
-    serviceAmount: string;
+    serviceAmount: number;
     createdAt: nat64;
 }>
 
 type ServiceRenderedPayload = Record<{
     serviceName: string;
     serviceDescription: string;
-    serviceAmount: string;
+    serviceAmount: number;
 }>
 
 // storage for storing all created saloon.
@@ -40,26 +40,55 @@ const saloonStorage = new StableBTreeMap<string, Saloon>(0, 44, 1024);
 // Function to fetch all saloons created. 
 $query;
 export function getAllSaloons(): Result<Vec<Saloon>, string> {
-    return Result.Ok(saloonStorage.values());
+    try {
+        const saloons = saloonStorage.values();
+        if (saloons.length === 0) {
+          return Result.Err("No saloons found.");
+        }
+        return Result.Ok(saloons);
+      } catch (error) {
+        return Result.Err(`Error fetching saloons: ${error}`);
+      }
 }
 
 
 // Function that gets the information about a saloon through it's id.
 $query;
 export function getSaloonById(id: string): Result<Saloon, string> {
-    return match(saloonStorage.get(id), {
+    if (!id) {
+        return Result.Err<Saloon, string>("Invalid id");
+      }
+      return match(saloonStorage.get(id), {
         Some: (saloon) => Result.Ok<Saloon, string>(saloon),
-        None: () => Result.Err<Saloon, string>(`The saloon with id=${id} is not found`)
-    });
+        None: () =>
+          Result.Err<Saloon, string>(`Saloon with id=${id} does not exist`),
+      });
 }
 
 
 // Function that allow users to create a new saloon
 $update;
 export function createSaloon(payload: SaloonPayload): Result<Saloon, string> {
-    const saloon: Saloon = { id: uuidv4(), owner: ic.caller(), rating: 1.0, servicesRendered : [], createdAt: ic.time(), updatedAt: Opt.None, ...payload };
-    saloonStorage.insert(saloon.id, saloon);
-    return Result.Ok(saloon);
+    if (
+        !payload.saloonName ||
+        !payload.saloonLocation ||
+        !payload.attachmentURL
+      ) {
+        return Result.Err("Missing required fields in payload");
+      }
+    
+      const saloon: Saloon = {
+        id: uuidv4(),
+        owner: ic.caller(),
+        rating: 1.0,
+        servicesRendered: [],
+        createdAt: ic.time(),
+        updatedAt: Opt.None,
+        ...payload,
+      };
+      // Update the team in the storage;
+      saloonStorage.insert(saloon.id, saloon);
+      return Result.Ok(saloon);
 }
 
 
@@ -112,6 +141,13 @@ export function deleteSaloon(id: string): Result<Saloon, string> {
 // Function that allow user to rate a saloon
 $update;
 export function rateSaloon(id: string, rate: number): Result<Saloon, string> {
+    
+    // Ensure that the rate system falls at a particular range
+    if (rate < 0 || rate > 5) {
+        return Result.Err<Saloon, string>(
+          `Error rating saloon with the id=${id}. Invalid rating value. Value should not be more than 5 or less than 0`
+        );
+      }
     
     // Gets the saloon details by it's id
     const saloonRating: any = match(saloonStorage.get(id), {
